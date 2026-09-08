@@ -1,5 +1,9 @@
 # 📊 Leitor de Prestação de Contas Patrimoniais
 
+## 📸 Demonstração
+
+![Tela Inicial](tela.png)
+
 Aplicação web desenvolvida para leitura, consolidação e análise de arquivos de prestação de contas patrimoniais das Secretarias do Estado do Amazonas.
 
 A solução foi criada para simplificar a conferência de informações patrimoniais, permitindo a leitura em lote de arquivos JSON, provenientes de prestações de contas de bens móveis, estoque e imóveis. A aplicação realiza a consolidação automática dos dados, apresenta estatísticas operacionais, permite pesquisas rápidas e exporta os resultados para planilhas Excel. 【1-80573a】

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leitor de Lote · Patrimônio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F1F3F6;
+    --surface:#FFFFFF;
+    --ink:#171F2E;
+    --navy:#1D2D50;
+    --navy-deep:#141F38;
+    --slate:#57647D;
+    --line:#DBE1EA;
+    --teal:#1B7A63;
+    --teal-deep:#145E4C;
+    --amber:#9A5B0B;
+    --tag-bg:#EAF0FB;
+    --tag-ink:#1D2D50;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 24px 60px;
+  }
+
+  /* Header */
+  header.top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:18px;
+    border-bottom:2px solid var(--navy);
+    margin-bottom:22px;
+  }
+  .brand-eyebrow{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    margin:0 0 4px;
+  }
+  h1{
+    font-size:23px;
+    font-weight:700;
+    margin:0;
+    color:var(--navy-deep);
+    letter-spacing:-.01em;
+  }
+  .top-meta{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--slate);
+    text-align:right;
+    line-height:1.5;
+  }
+
+  /* Dropzone */
+  .dropzone{
+    background:var(--surface);
+    border:1.5px dashed #B7C2D2;
+    border-radius:10px;
+    padding:30px 24px;
+    display:flex;
+    align-items:center;
+    gap:20px;
+    flex-wrap:wrap;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone.drag{
+    border-color:var(--teal);
+    background:#F1FAF7;
+  }
+  .dropzone-icon{
+    flex:none;
+    width:46px;height:46px;
+    border-radius:9px;
+    background:var(--navy);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .dropzone-icon svg{width:22px;height:22px;}
+  .dropzone-text{flex:1;min-width:220px;}
+  .dropzone-text strong{display:block;font-size:14.5px;margin-bottom:2px;}
+  .dropzone-text span{font-size:12.5px;color:var(--slate);}
+  .dropzone-buttons{display:flex; gap:10px; flex:none;}
+  .btn{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:600;
+    border:none;
+    border-radius:7px;
+    padding:10px 18px;
+    cursor:pointer;
+    transition:transform .08s ease, box-shadow .15s ease, background .15s ease;
+    white-space:nowrap;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn:focus-visible{outline:2px solid var(--navy); outline-offset:2px;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-deep);}
+  .btn-teal{background:var(--teal); color:#fff;}
+  .btn-teal:hover{background:var(--teal-deep);}
+  .btn-teal:disabled{background:#9FB0AA; cursor:not-allowed;}
+  .btn-ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
+  .btn-ghost:hover{border-color:var(--navy);}
+  input[type=file]{display:none;}
+
+  /* Status line */
+  .status{
+    margin-top:14px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--slate);
+    min-height:18px;
+  }
+  .status.err{color:#A3341A;}
+  .status.ok{color:var(--teal-deep);}
+
+  /* Stats strip */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:22px;
+  }
+  .stat{
+    background:var(--surface);
+    padding:14px 16px;
+  }
+  .stat .label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin-bottom:6px;
+  }
+  .stat .value{
+    font-family:var(--mono);
+    font-size:19px;
+    font-weight:600;
+    color:var(--navy-deep);
+  }
+
+  /* File summary */
+  .file-summary{
+    margin-top:16px;
+    font-size:13px;
+    color:var(--ink);
+    background:#EEF4F1;
+    border:1px solid #C9E0D6;
+    border-radius:8px;
+    padding:10px 14px;
+    line-height:1.5;
+  }
+  .file-summary strong{color:var(--teal-deep);}
+
+  /* Tabs */
+  .tabs-bar{
+    margin-top:16px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    border-bottom:1.5px solid var(--line);
+    padding-bottom:0;
+  }
+  .tab-btn{
+    font-family:var(--sans);
+    font-size:13px;
+    font-weight:600;
+    color:var(--slate);
+    background:transparent;
+    border:none;
+    border-bottom:3px solid transparent;
+    padding:9px 14px 10px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    transform:translateY(1.5px);
+    transition:color .12s ease, border-color .12s ease;
+  }
+  .tab-btn:hover{color:var(--navy);}
+  .tab-btn.active{
+    color:var(--navy-deep);
+    border-bottom-color:var(--teal);
+  }
+  .tab-count{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:500;
+    color:var(--slate);
+    background:#EDF1F6;
+    border-radius:20px;
+    padding:1px 8px;
+  }
+  .tab-btn.active .tab-count{
+    color:#fff;
+    background:var(--navy);
+  }
+
+  /* Toolbar */
+  .toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:26px;
+    flex-wrap:wrap;
+  }  .search{
+    position:relative;
+    flex:1;
+    min-width:220px;
+    max-width:360px;
+  }
+  .search input{
+    width:100%;
+    padding:9px 12px 9px 34px;
+    border:1.5px solid var(--line);
+    border-radius:7px;
+    font-family:var(--sans);
+    font-size:13px;
+    background:var(--surface);
+  }
+  .search input:focus{outline:none; border-color:var(--navy);}
+  .search svg{
+    position:absolute; left:11px; top:50%; transform:translateY(-50%);
+    width:14px;height:14px; color:var(--slate);
+  }
+  .toolbar-actions{display:flex; gap:10px; align-items:center;}
+
+  /* Table */
+  .table-wrap{
+    margin-top:14px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:auto;
+    max-height:560px;
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    font-size:12.5px;
+    min-width:600px;
+  }
+  thead th{
+    position:sticky; top:0;
+    background:var(--navy);
+    color:#fff;
+    font-family:var(--mono);
+    font-weight:500;
+    font-size:11px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    text-align:left;
+    padding:10px 12px;
+    white-space:nowrap;
+    border-right:1px solid rgba(255,255,255,.08);
+  }
+  tbody td{
+    padding:8px 12px;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+    font-family:var(--mono);
+    color:var(--ink);
+  }
+  tbody tr:nth-child(even){background:#FAFBFD;}
+  tbody tr:hover{background:#EEF4F1;}
+  .tag-chip{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--tag-ink);
+    background:var(--tag-bg);
+    border:1px solid #C9D8F0;
+    border-radius:5px;
+    padding:2px 8px;
+  }
+  .col-desc{
+    white-space:normal;
+    min-width:260px;
+    max-width:420px;
+    font-family:var(--sans);
+    color:var(--slate);
+  }
+  .empty-state{
+    padding:50px 20px;
+    text-align:center;
+    color:var(--slate);
+    font-size:13.5px;
+  }
+
+  /* Pagination */
+  .pagination{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:14px;
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--slate);
+  }
+  .pagination .pages{display:flex; gap:8px; align-items:center;}
+  .pagination button{
+    background:var(--surface);
+    border:1.5px solid var(--line);
+    border-radius:6px;
+    width:30px;height:30px;
+    cursor:pointer;
+    font-family:var(--mono);
+    color:var(--navy);
+  }
+  .pagination button:disabled{opacity:.4; cursor:not-allowed;}
+  .pagination button:not(:disabled):hover{border-color:var(--navy);}
+
+  .errors-box{
+    margin-top:14px;
+    border:1px solid #E4C6B4;
+    background:#FCF3EC;
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:12px;
+    color:var(--amber);
+    font-family:var(--mono);
+    max-height:140px;
+    overflow:auto;
+  }
+  .errors-box strong{display:block; margin-bottom:6px; color:#7A3E08;}
+
+  @media (max-width:640px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    header.top{flex-direction:column; align-items:flex-start;}
+    .top-meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div>
+      <p class="brand-eyebrow">Controle patrimonial · leitura de lote</p>
+      <h1>Leitor de Lote (.zip)</h1>
+    </div>
+    <div class="top-meta" id="fileMeta">Nenhum arquivo carregado</div>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    </div>
+    <div class="dropzone-text">
+      <strong>Solte aqui o .zip do lote ou uma pasta</strong>
+      <span>Ex.: lote_202601.zip, ou a pasta já descompactada — procura automaticamente por arquivos .json em todas as subpastas.</span>
+    </div>
+    <div class="dropzone-buttons">
+      <button class="btn btn-primary" id="pickZipBtn">Selecionar .zip</button>
+      <button class="btn btn-ghost" id="pickFolderBtn">Selecionar pasta</button>
+    </div>
+    <input type="file" id="fileInput" accept=".zip">
+    <input type="file" id="folderInput" webkitdirectory directory multiple>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="errors-box" id="errorsBox" style="display:none;"></div>
+
+  <div class="stats" id="statsBox" style="display:none;">
+    <div class="stat"><div class="label">Arquivos JSON lidos</div><div class="value" id="statFiles">0</div></div>
+    <div class="stat"><div class="label">Registros (bens)</div><div class="value" id="statRecords">0</div></div>
+    <div class="stat"><div class="label">Soma valor líquido</div><div class="value" id="statValor">R$ 0,00</div></div>
+    <div class="stat"><div class="label">Colunas detectadas</div><div class="value" id="statCols">0</div></div>
+  </div>
+
+  <div class="file-summary" id="fileSummary" style="display:none;"></div>
+
+  <div class="tabs-bar" id="tabsBar" style="display:none;"></div>
+
+  <div class="toolbar" id="toolbar" style="display:none;">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchInput" placeholder="Buscar em todos os campos…">
+    </div>
+    <div class="toolbar-actions">
+      <span id="filterInfo" style="font-family:var(--mono);font-size:12px;color:var(--slate);"></span>
+      <button class="btn btn-teal" id="exportBtn" disabled>Exportar para Excel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state">Carregue um arquivo .zip para visualizar os dados do lote.</div>
+  </div>
+
+  <div class="pagination" id="pagination" style="display:none;">
+    <span id="pageInfo"></span>
+    <div class="pages">
+      <button id="prevPage">‹</button>
+      <span id="pageLabel">1 / 1</span>
+      <button id="nextPage">›</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const PAGE_SIZE = 60;
+
+  let allRecords = [];
+  let columns = [];
+  let filtered = [];
+  let currentPage = 1;
+  let sourceFileName = '';
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const folderInput = document.getElementById('folderInput');
+  const pickZipBtn = document.getElementById('pickZipBtn');
+  const pickFolderBtn = document.getElementById('pickFolderBtn');
+  const statusEl = document.getElementById('status');
+  const errorsBox = document.getElementById('errorsBox');
+  const statsBox = document.getElementById('statsBox');
+  const toolbar = document.getElementById('toolbar');
+  const tableWrap = document.getElementById('tableWrap');
+  const pagination = document.getElementById('pagination');
+  const fileMeta = document.getElementById('fileMeta');
+  const exportBtn = document.getElementById('exportBtn');
+  const searchInput = document.getElementById('searchInput');
+  const filterInfo = document.getElementById('filterInfo');
+  const tabsBar = document.getElementById('tabsBar');
+  const fileSummary = document.getElementById('fileSummary');
+
+  let categoryData = {};   // { fileLabel: { records:[], columns:[], colSeen:Set, fileCount:number } }
+  let categoryOrder = [];  // fileLabels in sorted order
+  let activeTab = 'ALL';
+
+  pickZipBtn.addEventListener('click', () => fileInput.click());
+  pickFolderBtn.addEventListener('click', () => folderInput.click());
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) processZip(e.target.files[0]);
+    fileInput.value = '';
+  });
+
+  folderInput.addEventListener('change', e => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) processFolderFiles(files);
+    folderInput.value = '';
+  });
+
+  ['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+    e.preventDefault(); dropzone.classList.add('drag');
+  }));
+  ['dragleave'].forEach(ev => dropzone.addEventListener(ev, e => {
+    e.preventDefault(); dropzone.classList.remove('drag');
+  }));
+  dropzone.addEventListener('drop', async e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+
+    const items = e.dataTransfer.items;
+    // Caso o navegador suporte entradas de sistema de arquivos (permite reconhecer pastas arrastadas)
+    if (items && items.length && items[0].webkitGetAsEntry){
+      const entries = Array.from(items).map(it => it.webkitGetAsEntry()).filter(Boolean);
+      if (entries.length === 1 && entries[0].isFile){
+        const file = await entryToFile(entries[0]);
+        if (/\.zip$/i.test(file.name)){ processZip(file); return; }
+      }
+      // Uma ou mais pastas (ou mistura de arquivos) — varre recursivamente
+      const collected = [];
+      for (const entry of entries){
+        await walkEntry(entry, collected);
+      }
+      const jsonFiles = collected.filter(f => /\.json$/i.test(f.name));
+      if (jsonFiles.length){
+        processFolderFiles(jsonFiles, entries[0].name);
+        return;
+      }
+      const zipFile = collected.find(f => /\.zip$/i.test(f.name));
+      if (zipFile){ processZip(zipFile); return; }
+      setStatus('Nenhum arquivo .zip ou .json foi encontrado no item arrastado.', 'err');
+      return;
+    }
+
+    // Fallback: sem suporte a entradas, trata como arquivo simples
+    const f = e.dataTransfer.files[0];
+    if (f) processZip(f);
+  });
+
+  function entryToFile(entry){
+    return new Promise((resolve, reject) => entry.file(resolve, reject));
+  }
+
+  function walkEntry(entry, out, path){
+    path = path || '';
+    return new Promise((resolve) => {
+      if (entry.isFile){
+        entry.file(file => {
+          Object.defineProperty(file, 'webkitRelativePath', { value: path + entry.name });
+          out.push(file);
+          resolve();
+        }, () => resolve());
+      } else if (entry.isDirectory){
+        const reader = entry.createReader();
+        const readAll = (acc) => {
+          reader.readEntries(async (batch) => {
+            if (!batch.length){
+              for (const child of acc){
+                await walkEntry(child, out, path + entry.name + '/');
+              }
+              resolve();
+            } else {
+              readAll(acc.concat(batch));
+            }
+          }, () => resolve());
+        };
+        readAll([]);
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  function setStatus(msg, kind){
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function fmtMoney(n){
+    return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function readFileAsText(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo'));
+      reader.readAsText(file);
+    });
+  }
+
+  // Recebe uma lista de { path, getText() } e monta a tabela final (usado tanto para zip quanto para pasta)
+  async function buildFromEntries(entryList, originLabel){
+    setStatus('Processando ' + entryList.length + ' arquivo(s) JSON…');
+
+    const records = [];
+    const errors = [];
+    const colOrder = [];
+    const colSeen = new Set();
+    const cats = {};    // fileLabel -> { records:[], columns:[], colSeen:Set, fileCount:number }
+    const catNames = [];
+
+    for (const entry of entryList){
+      try {
+        const text = await entry.getText();
+        const parsed = JSON.parse(text);
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        const fileLabel = entry.path.split('/').pop();
+
+        if (!cats[fileLabel]){
+          cats[fileLabel] = { records: [], columns: [], colSeen: new Set(), fileCount: 0 };
+          catNames.push(fileLabel);
+        }
+        cats[fileLabel].fileCount++;
+
+        arr.forEach(rec => {
+          if (rec && typeof rec === 'object'){
+            rec.__arquivoOrigem = fileLabel;
+
+            Object.keys(rec).forEach(k => {
+              if (!colSeen.has(k)){ colSeen.add(k); colOrder.push(k); }
+              if (!cats[fileLabel].colSeen.has(k)){
+                cats[fileLabel].colSeen.add(k);
+                cats[fileLabel].columns.push(k);
+              }
+            });
+
+            records.push(rec);
+            cats[fileLabel].records.push(rec);
+          }
+        });
+      } catch(err){
+        errors.push(entry.path + ' — ' + err.message);
+      }
+    }
+
+    if (colSeen.has('__arquivoOrigem')){
+      colOrder.splice(colOrder.indexOf('__arquivoOrigem'), 1);
+      colOrder.push('__arquivoOrigem');
+    }
+    catNames.sort();
+    catNames.forEach(name => {
+      const c = cats[name];
+      if (c.colSeen.has('__arquivoOrigem')){
+        c.columns.splice(c.columns.indexOf('__arquivoOrigem'), 1);
+      }
+    });
+
+    allRecords = records;
+    columns = colOrder;
+    categoryData = cats;
+    categoryOrder = catNames;
+    activeTab = 'ALL';
+    filtered = records;
+    currentPage = 1;
+    searchInput.value = '';
+    filterInfo.textContent = '';
+
+    if (errors.length){
+      errorsBox.style.display = 'block';
+      errorsBox.innerHTML = '<strong>' + errors.length + ' arquivo(s) não puderam ser lidos:</strong>' +
+        errors.map(e => '<div>' + escapeHtml(e) + '</div>').join('');
+    } else {
+      errorsBox.style.display = 'none';
+      errorsBox.innerHTML = '';
+    }
+
+    if (records.length === 0){
+      setStatus('Os arquivos JSON foram lidos, mas nenhum registro válido foi encontrado.', 'err');
+      renderEmpty();
+      return;
+    }
+
+    renderFileSummary(catNames, cats);
+    renderTabs(catNames, cats);
+    renderStats();
+    renderTable();
+    toolbar.style.display = 'flex';
+    exportBtn.disabled = false;
+    setStatus(originLabel + ' carregado(a) com sucesso: ' + entryList.length + ' arquivo(s), ' + records.length + ' registro(s).', 'ok');
+  }
+
+  function renderFileSummary(catNames, cats){
+    if (catNames.length === 0){
+      fileSummary.style.display = 'none';
+      return;
+    }
+    fileSummary.style.display = 'block';
+    if (catNames.length === 1){
+      const name = catNames[0];
+      fileSummary.innerHTML = 'Somente <strong>' + escapeHtml(name) + '</strong> foi gerado neste lote (' +
+        cats[name].records.length.toLocaleString('pt-BR') + ' registro(s)).';
+    } else {
+      const parts = catNames.map(n => '<strong>' + escapeHtml(n) + '</strong> (' + cats[n].records.length.toLocaleString('pt-BR') + ')');
+      fileSummary.innerHTML = 'Arquivos identificados neste lote: ' + parts.join(', ') + '.';
+    }
+  }
+
+  function renderTabs(catNames, cats){
+    if (catNames.length <= 1){
+      tabsBar.style.display = 'none';
+      tabsBar.innerHTML = '';
+      return;
+    }
+    tabsBar.style.display = 'flex';
+    let html = '<button class="tab-btn active" data-tab="ALL">Todos <span class="tab-count">' +
+      allRecords.length.toLocaleString('pt-BR') + '</span></button>';
+    catNames.forEach(name => {
+      html += '<button class="tab-btn" data-tab="' + escapeHtml(name) + '">' + escapeHtml(name) +
+        ' <span class="tab-count">' + cats[name].records.length.toLocaleString('pt-BR') + '</span></button>';
+    });
+    tabsBar.innerHTML = html;
+
+    tabsBar.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeTab = btn.getAttribute('data-tab');
+        tabsBar.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        searchInput.value = '';
+        filterInfo.textContent = '';
+        currentPage = 1;
+        applyFilter();
+      });
+    });
+  }
+
+  function getActiveBaseRecords(){
+    return activeTab === 'ALL' ? allRecords : (categoryData[activeTab] ? categoryData[activeTab].records : []);
+  }
+
+  function getActiveColumns(){
+    if (activeTab === 'ALL') return columns;
+    return categoryData[activeTab] ? categoryData[activeTab].columns : columns;
+  }
+
+  async function processZip(file){
+    if (!/\.zip$/i.test(file.name)){
+      setStatus('O arquivo selecionado não é um .zip.', 'err');
+      return;
+    }
+    sourceFileName = file.name.replace(/\.zip$/i, '');
+    fileMeta.textContent = file.name + ' · ' + (file.size/1024/1024).toFixed(2) + ' MB';
+    setStatus('Lendo o arquivo compactado…');
+    errorsBox.style.display = 'none';
+    errorsBox.innerHTML = '';
+    exportBtn.disabled = true;
+
+    try {
+      const zip = await JSZip.loadAsync(file);
+      const jsonPaths = Object.keys(zip.files).filter(name => {
+        const entry = zip.files[name];
+        return !entry.dir && /\.json$/i.test(name);
+      }).sort();
+
+      if (jsonPaths.length === 0){
+        setStatus('Nenhum arquivo .json foi encontrado dentro do .zip (procurado em todas as pastas e subpastas).', 'err');
+        return;
+      }
+
+      const entryList = jsonPaths.map(path => ({
+        path,
+        getText: () => zip.files[path].async('string')
+      }));
+
+      await buildFromEntries(entryList, 'Lote (.zip)');
+
+    } catch(err){
+      setStatus('Não foi possível abrir o .zip: ' + err.message, 'err');
+    }
+  }
+
+  async function processFolderFiles(files, folderName){
+    const jsonFiles = files.filter(f => /\.json$/i.test(f.name));
+    if (jsonFiles.length === 0){
+      setStatus('Nenhum arquivo .json foi encontrado na pasta selecionada (procurado em todas as subpastas).', 'err');
+      return;
+    }
+
+    const topFolder = folderName || (jsonFiles[0].webkitRelativePath
+      ? jsonFiles[0].webkitRelativePath.split('/')[0]
+      : 'pasta');
+    sourceFileName = topFolder;
+    fileMeta.textContent = topFolder + ' · ' + jsonFiles.length + ' arquivo(s) .json';
+    setStatus('Lendo arquivos da pasta…');
+    errorsBox.style.display = 'none';
+    errorsBox.innerHTML = '';
+    exportBtn.disabled = true;
+
+    const entryList = jsonFiles.map(f => ({
+      path: f.webkitRelativePath || f.name,
+      getText: () => readFileAsText(f)
+    }));
+
+    await buildFromEntries(entryList, 'Pasta');
+  }
+
+  function renderStats(){
+    const baseRecords = getActiveBaseRecords();
+    const activeCols = getActiveColumns();
+    statsBox.style.display = 'grid';
+    const fileCount = activeTab === 'ALL'
+      ? categoryOrder.reduce((s, n) => s + categoryData[n].fileCount, 0)
+      : (categoryData[activeTab] ? categoryData[activeTab].fileCount : 0);
+    document.getElementById('statFiles').textContent = fileCount;
+    document.getElementById('statRecords').textContent = baseRecords.length.toLocaleString('pt-BR');
+    const soma = baseRecords.reduce((s, r) => s + (Number(r.vlLiquido) || 0), 0);
+    document.getElementById('statValor').textContent = fmtMoney(soma);
+    document.getElementById('statCols').textContent = activeCols.length;
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderEmpty(){
+    tableWrap.innerHTML = '<div class="empty-state">Nenhum registro para exibir.</div>';
+    toolbar.style.display = 'none';
+    pagination.style.display = 'none';
+  }
+
+  function renderTable(){
+    if (filtered.length === 0){
+      renderEmpty();
+      pagination.style.display = 'none';
+      return;
+    }
+    const activeCols = getActiveColumns();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+    let html = '<table><thead><tr>';
+    activeCols.forEach(c => { html += '<th>' + escapeHtml(displayName(c)) + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    pageRows.forEach(rec => {
+      html += '<tr>';
+      activeCols.forEach(c => {
+        const val = rec[c];
+        html += '<td class="' + cellClass(c) + '">' + formatCell(c, val) + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    tableWrap.innerHTML = html;
+
+    pagination.style.display = 'flex';
+    document.getElementById('pageInfo').textContent =
+      'Exibindo ' + (start+1) + '–' + Math.min(start+PAGE_SIZE, filtered.length) + ' de ' + filtered.length + ' registro(s)';
+    document.getElementById('pageLabel').textContent = currentPage + ' / ' + totalPages;
+    document.getElementById('prevPage').disabled = currentPage <= 1;
+    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+  }
+
+  function displayName(c){
+    if (c === '__arquivoOrigem') return 'Arquivo de origem';
+    return c;
+  }
+
+  function cellClass(c){
+    if (c === 'desObjeto') return 'col-desc';
+    return '';
+  }
+
+  function formatCell(c, val){
+    if (val === undefined || val === null || val === '') return '';
+    if (c === 'nrTombamento') return '<span class="tag-chip">' + escapeHtml(val) + '</span>';
+    if (c === 'desObjeto') return escapeHtml(val);
+    return escapeHtml(val);
+  }
+
+  function applyFilter(){
+    const baseRecords = getActiveBaseRecords();
+    const activeCols = getActiveColumns();
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q){
+      filtered = baseRecords;
+      filterInfo.textContent = '';
+    } else {
+      filtered = baseRecords.filter(rec =>
+        activeCols.some(c => String(rec[c] ?? '').toLowerCase().includes(q))
+      );
+      filterInfo.textContent = filtered.length + ' de ' + baseRecords.length + ' registro(s)';
+    }
+    renderStats();
+    renderTable();
+  }
+
+  searchInput.addEventListener('input', () => {
+    currentPage = 1;
+    applyFilter();
+  });
+
+  document.getElementById('prevPage').addEventListener('click', () => {
+    if (currentPage > 1){ currentPage--; renderTable(); }
+  });
+  document.getElementById('nextPage').addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (currentPage < totalPages){ currentPage++; renderTable(); }
+  });
+
+  function safeSheetName(name){
+    // Excel limita nomes de aba a 31 caracteres e não aceita : \ / ? * [ ]
+    let clean = name.replace(/\.[jJ][sS][oO][nN]$/, '').replace(/[:\\\/\?\*\[\]]/g, '-');
+    return clean.slice(0, 31) || 'dados';
+  }
+
+  exportBtn.addEventListener('click', () => {
+    if (!allRecords.length) return;
+    const wb = XLSX.utils.book_new();
+
+    categoryOrder.forEach(name => {
+      const cat = categoryData[name];
+      const ws = XLSX.utils.json_to_sheet(cat.records, { header: cat.columns });
+      ws['!cols'] = cat.columns.map(c => ({ wch: Math.max(12, Math.min(40, c.length + 4)) }));
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name));
+    });
+
+    if (categoryOrder.length > 1){
+      const wsAll = XLSX.utils.json_to_sheet(allRecords, { header: columns });
+      wsAll['!cols'] = columns.map(c => ({ wch: Math.max(12, Math.min(40, c.length + 4)) }));
+      XLSX.utils.book_append_sheet(wb, wsAll, 'Todos');
+    }
+
+    const outName = (sourceFileName || 'lote') + '.xlsx';
+    XLSX.writeFile(wb, outName);
+  });
+})();
+</script>
+</body>
+</html>
